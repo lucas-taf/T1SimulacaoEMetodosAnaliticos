@@ -18,7 +18,6 @@ class GeradorAleatorio:
 
 
 class Fila:
-    # Ajuste: Capacidade agora pode ser None (infinita)
     def __init__(self, id_fila, servidores, capacidade=None, intervalo_servico=None, intervalo_chegada=None):
         self.id = id_fila
         self.servidores = servidores
@@ -28,7 +27,7 @@ class Fila:
 
         self.estado_atual = 0
         self.perdas = 0
-        # Ajuste: defaultdict permite criar os estados dinamicamente à medida que a fila cresce
+        
         self.tempos_estados = defaultdict(float)
 
     def registrar_tempo_estado(self, delta_tempo):
@@ -92,7 +91,7 @@ class RedeFilasSimulador:
     def proximo_destino(self, fila_id):
         destinos = self.roteamento.get(fila_id, [])
         if not destinos:
-            return None # Sai do sistema se não houver rotas
+            return None
 
         rnd = self.rng.next_random()
         if rnd is None:
@@ -104,7 +103,7 @@ class RedeFilasSimulador:
             if rnd <= acumulado:
                 return destino
 
-        return None # Sai do sistema se o rnd for maior que a soma das probabilidades
+        return None
 
     def next_event(self):
         if self.eventos:
@@ -123,7 +122,7 @@ class RedeFilasSimulador:
         if gerar_proxima_externa:
             self.agendar_chegada_externa(fila_id)
 
-        # Ajuste: Verifica se a capacidade é infinita (None) ou se tem espaço
+        
         if fila.capacidade is None or fila.estado_atual < fila.capacidade:
             fila.estado_atual += 1
             if fila.estado_atual <= fila.servidores:
@@ -137,7 +136,6 @@ class RedeFilasSimulador:
         if fila.estado_atual > 0:
             fila.estado_atual -= 1
 
-        # Ajuste Crítico (Consumo do RNG): Decide o roteamento ANTES de alocar o próximo no servidor
         destino = self.proximo_destino(fila_id)
 
         if fila.estado_atual >= fila.servidores:
@@ -195,16 +193,13 @@ class RedeFilasSimulador:
         print("=" * 50)
 
 if __name__ == "__main__":
-    # 1. Lê o arquivo YAML lidando com a tag customizada !PARAMETERS do professor
     with open("modelo.yml", "r") as arquivo:
         conteudo = arquivo.read()
-        conteudo = conteudo.replace("!PARAMETERS", "") # Remove a tag para não quebrar o parser
+        conteudo = conteudo.replace("!PARAMETERS", "")
         config_yaml = yaml.safe_load(conteudo)
 
-    # 2. Traduz do formato YAML do professor para o formato do nosso simulador
     config_T1 = {"filas": {}, "roteamento": {}}
     
-    # Monta as Filas
     for fila_id, dados in config_yaml["queues"].items():
         capacidade = dados.get("capacity", float('inf'))
         chegada = (dados["minArrival"], dados["maxArrival"]) if "minArrival" in dados else None
@@ -217,7 +212,6 @@ if __name__ == "__main__":
             "servico": servico
         }
 
-    # Monta o Roteamento
     for rota in config_yaml.get("network", []):
         origem = rota["source"]
         destino = rota["target"]
@@ -227,14 +221,11 @@ if __name__ == "__main__":
             config_T1["roteamento"][origem] = []
         config_T1["roteamento"][origem].append((destino, probabilidade))
 
-    # Identifica o tempo inicial e a fila inicial
     fila_inicial = list(config_yaml["arrivals"].keys())[0]
     tempo_inicial = config_yaml["arrivals"][fila_inicial]
     
-    # Identifica a primeira semente da lista
     semente_usada = config_yaml["seeds"][0] if "seeds" in config_yaml else 42
 
-    # 3. Executa o simulador
     simulador = RedeFilasSimulador(config=config_T1, semente=semente_usada)
     simulador.executar(primeira_chegada_fila1=tempo_inicial)
     simulador.exibir_relatorio()
